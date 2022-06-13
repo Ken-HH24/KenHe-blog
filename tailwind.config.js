@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-const { spacing, fontFamily } = require('tailwindcss/defaultTheme');
+const { spacing, fontFamily } = require("tailwindcss/defaultTheme");
 
 module.exports = {
   content: [
@@ -98,5 +98,8 @@ module.exports = {
   variants: {
     typography: ["dark"],
   },
-  plugins: [require("@tailwindcss/typography")],
+  plugins: [
+    require("@tailwindcss/typography"),
+    require("@tailwindcss/line-clamp"),
+  ],
 };
