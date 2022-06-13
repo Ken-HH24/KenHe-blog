@@ -3,6 +3,7 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { allPosts } from "contentlayer/generated";
 import { useMDXComponent } from "next-contentlayer/hooks";
+import { InferGetStaticPropsType } from "next";
 
 export async function getStaticPaths() {
   const paths = allPosts.map((post) => post.url);
@@ -21,7 +22,9 @@ export async function getStaticProps({ params }) {
   };
 }
 
-const PostLayout = ({ post }) => {
+const PostLayout = ({
+  post,
+}: InferGetStaticPropsType<typeof getStaticProps>) => {
   const MDXContent = useMDXComponent(post.body.code);
   return (
     <>

@@ -1,9 +1,14 @@
 import NextLink from "next/link";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 
-function NavItem({ href, text }) {
+interface NavItemProps {
+  href: string;
+  text: string;
+}
+
+const NavItem: React.FC<NavItemProps> = ({ href, text }) => {
   const router = useRouter();
   const isActive = router.asPath === href;
 
@@ -20,9 +25,13 @@ function NavItem({ href, text }) {
       </a>
     </NextLink>
   );
+};
+
+interface IProps {
+  children: ReactNode;
 }
 
-const Container = ({ children }) => {
+const Container: React.FC<IProps> = ({ children }) => {
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
 

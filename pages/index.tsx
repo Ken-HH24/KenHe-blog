@@ -4,15 +4,16 @@ import Image from "next/image";
 import Container from "../components/Container";
 import BlogPostCard from "../components/BlogPostCard";
 import Link from "next/link";
+import { InferGetStaticPropsType } from "next";
 
-export async function getStaticProps() {
+export const getStaticProps = () => {
   const posts = allPosts
     .sort((a, b) => {
       return compareDesc(new Date(a.date), new Date(b.date));
     })
     .slice(0, 3);
   return { props: { posts } };
-}
+};
 
 const GRADIENTS = [
   "from-[#D8B4FE] to-[#818CF8]",
@@ -20,7 +21,9 @@ const GRADIENTS = [
   "from-[#FDE68A] via-[#FCA5A5] to-[#FECACA]",
 ];
 
-export default function Home({ posts }) {
+export default function Home({
+  posts,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
   return (
     <Container>
       <div className="flex flex-col justify-center items-start max-w-2xl border-gray-200 dark:border-gray-700 mx-auto pb-16">

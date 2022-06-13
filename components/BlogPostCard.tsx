@@ -1,7 +1,14 @@
 import Link from "next/link";
-import { compareDesc, format, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
+import React from "react";
+import { Post } from "../types/post";
 
-export default function BlogPostCard({ post, gradient }) {
+interface IProps {
+  post: Post;
+  gradient: string;
+}
+
+const BlogPostCard: React.FC<IProps> = ({ post, gradient }) => {
   return (
     <Link href={post.url}>
       <a
@@ -36,4 +43,8 @@ export default function BlogPostCard({ post, gradient }) {
       </a>
     </Link>
   );
-}
+};
+
+export default BlogPostCard;
+
+// export default function BlogPostCard({ post, gradient }) {}
