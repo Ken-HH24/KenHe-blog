@@ -1,7 +1,11 @@
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
-const ThemeButton = () => {
+interface IProps {
+  className?: string;
+}
+
+const ThemeButton: React.FC<IProps> = ({ className }) => {
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
 
@@ -12,7 +16,7 @@ const ThemeButton = () => {
     <button
       aria-label="Toggle Dark Mode"
       type="button"
-      className="w-9 h-9 bg-gray-200 rounded-lg dark:bg-gray-600 flex items-center justify-center  hover:ring-2 ring-gray-300  transition-all"
+      className={`w-9 h-9 bg-gray-200 rounded-lg dark:bg-gray-600 flex items-center justify-center  hover:ring-2 ring-gray-300  transition-all ${className}`}
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >
       {mounted && (
