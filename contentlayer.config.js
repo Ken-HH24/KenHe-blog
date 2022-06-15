@@ -16,19 +16,19 @@ const Tag = defineNestedType(() => ({
   },
 }));
 
-export const Post = defineDocumentType(() => ({
-  name: "Post",
+export const Blog = defineDocumentType(() => ({
+  name: "Blog",
   filePathPattern: `**/*.(md|mdx)`,
   contentType: "mdx",
   fields: {
     title: {
       type: "string",
-      description: "The title of the post",
+      description: "The title of the blog",
       required: true,
     },
     date: {
       type: "date",
-      description: "The date of the post",
+      description: "The date of the blog",
       required: true,
     },
     tags: {
@@ -39,14 +39,14 @@ export const Post = defineDocumentType(() => ({
   computedFields: {
     url: {
       type: "string",
-      resolve: (post) => `/posts/${post._raw.flattenedPath}`,
+      resolve: (blog) => `/blogs/${blog._raw.flattenedPath}`,
     },
   },
 }));
 
 export default makeSource({
-  contentDirPath: "posts",
-  documentTypes: [Post],
+  contentDirPath: "blogs",
+  documentTypes: [Blog],
   mdx: {
     remarkPlugins: [remarkGfm],
     rehypePlugins: [

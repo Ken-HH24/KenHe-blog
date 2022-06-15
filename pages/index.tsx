@@ -1,5 +1,5 @@
 import { compareDesc, format, parseISO } from "date-fns";
-import { allPosts } from "contentlayer/generated";
+import { allBlogs } from "contentlayer/generated";
 import Image from "next/image";
 import Container from "../components/Container";
 import BlogPostCard from "../components/BlogPostCard";
@@ -7,12 +7,12 @@ import Link from "next/link";
 import { InferGetStaticPropsType } from "next";
 
 export const getStaticProps = () => {
-  const posts = allPosts
+  const blogs = allBlogs
     .sort((a, b) => {
       return compareDesc(new Date(a.date), new Date(b.date));
     })
     .slice(0, 3);
-  return { props: { posts } };
+  return { props: { blogs } };
 };
 
 const GRADIENTS = [
@@ -22,7 +22,7 @@ const GRADIENTS = [
 ];
 
 export default function Home({
-  posts,
+  blogs,
 }: InferGetStaticPropsType<typeof getStaticProps>) {
   return (
     <Container>
@@ -56,13 +56,13 @@ export default function Home({
           Latest Posts
         </h3>
         <div className="flex gap-6 flex-col md:flex-row w-full">
-          {posts.map((post, index) => (
-            <BlogPostCard key={index} post={post} gradient={GRADIENTS[index]} />
+          {blogs.map((blog, index) => (
+            <BlogPostCard key={index} blog={blog} gradient={GRADIENTS[index]} />
           ))}
         </div>
         <Link href="/blog">
           <a className="flex mt-8 text-gray-600 dark:text-gray-400 leading-7 rounded-lg hover:text-gray-800 dark:hover:text-gray-200 transition-all h-6">
-            Read all posts
+            Read all blogs
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"

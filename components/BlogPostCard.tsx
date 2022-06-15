@@ -1,23 +1,23 @@
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import React from "react";
-import { Post } from "../types/post";
+import { Blog } from "contentlayer/generated";
 
 interface IProps {
-  post: Post;
+  blog: Blog;
   gradient: string;
 }
 
-const BlogPostCard: React.FC<IProps> = ({ post, gradient }) => {
+const BlogPostCard: React.FC<IProps> = ({ blog, gradient }) => {
   return (
-    <Link href={post.url}>
+    <Link href={blog.url}>
       <a
         className={`transform hover:scale-[1.01] transition-all rounded-xl w-full md:w-1/3 bg-gradient-to-r p-1 ${gradient}`}
       >
         <div className="flex flex-col justify-between h-full bg-white dark:bg-gray-900 rounded-lg p-4">
           <div className="flex flex-col md:flex-row justify-between">
             <h4 className="line-clamp-4 text-lg md:text-lg font-medium mb-6 sm:mb-10 w-full text-gray-900 dark:text-gray-100 tracking-tight">
-              {post.title}
+              {blog.title}
             </h4>
           </div>
           <div className="flex items-center text-gray-800 dark:text-gray-200 capsize">
@@ -36,7 +36,7 @@ const BlogPostCard: React.FC<IProps> = ({ post, gradient }) => {
               />
             </svg>
             <span className="ml-2 align-baseline capsize">
-              {format(parseISO(post.date), "yyyy.MM.dd")}
+              {format(parseISO(blog.date), "yyyy.MM.dd")}
             </span>
           </div>
         </div>
@@ -47,4 +47,3 @@ const BlogPostCard: React.FC<IProps> = ({ post, gradient }) => {
 
 export default BlogPostCard;
 
-// export default function BlogPostCard({ post, gradient }) {}
