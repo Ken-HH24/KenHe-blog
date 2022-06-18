@@ -12,7 +12,6 @@ import { getTagUrl } from "utils/tagUtils";
 
 export async function getStaticPaths() {
   const paths = allBlogs.map((post) => post.url);
-  console.log(paths);
   return {
     paths,
     fallback: false,

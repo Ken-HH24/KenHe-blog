@@ -1,0 +1,330 @@
+---
+title: "How I build my Next.js blog"
+date: 2022-06-18
+description: "从leerob.io中学习并获取灵感，使用 Next.js + Contentlayer + tailwind 建立blog，记录一些work and life"
+tags:
+  - title: Next.js
+---
+
+Hexo, Hugo, Docusaurus 等一直是出色的博客框架，也有漂亮的主题可以选择。但是在可定制化方面一直欠缺，在看到 **leerob** 的博客后发现，使用 **Next.js** 作为建站框架，**Contentlayer** 作为内容管理工具，完美契合页面和功能自定义，内容直接输出于 **Markdown** 的需求。
+
+# Contentlayer
+
+对于 Next.js 接入 Contentlayer，官方文档已经写得非常清楚了，详细看 [Get started](https://www.contentlayer.dev/docs/getting-started)
+
+## 配置
+
+在这里主要讲一下本 blog 在 **contentlayer.config.ts** 的配置
+
+### 数据结构定义
+
+#### Blog
+
+- 通过 `defineDocumentType()` 定义 **Blog** 这个数据结构
+- **contentType** 设置为 **mdx**
+- 数据结构主要有 **title** ， **description** ，**date** 以及 **tags** 属性。
+
+```typescript:contentlayer.config.ts
+export const Blog = defineDocumentType(() => ({
+  name: "Blog",
+  filePathPattern: `**/*.(md|mdx)`,
+  contentType: "mdx",
+  fields: {
+    title: {
+      type: "string",
+      description: "The title of the blog",
+      required: true,
+    },
+    description: {
+      type: "string",
+      description: "The description of the blog",
+    },
+    date: {
+      type: "date",
+      description: "The date of the blog",
+      required: true,
+    },
+    tags: {
+      type: "list",
+      of: Tag,
+      default: [],
+    },
+  },
+  computedFields: {
+    url: {
+      type: "string",
+      resolve: (blog) => `/blogs/${blog._raw.flattenedPath}`,
+    },
+  },
+}));
+```
+
+#### Tag
+
+在 **Blog** 里使用了 **Tag** 数据结构来支持多标签，主要的实现方法是：
+
+- 使用 `defineNestedType()` 定义嵌套数据结构
+- 在 **Blog** 的 **tags** 属性中定义 `type: "list"`
+
+```typescript:contentlayer.config.ts
+const Tag = defineNestedType(() => ({
+  name: "Tag",
+  fields: {
+    title: { type: "string", required: true },
+  },
+}));
+```
+
+### 插件
+
+在渲染 **Markdown** 时为了支持代码高亮，代码块标题等功能，使用了一系列 **rehype** 插件集成到 **Contentlayer** 中，主要都是模仿 **leerob.io** 的配置：
+
+```typescript:contentlayer.config.ts
+export default makeSource({
+  contentDirPath: "blogs",
+  documentTypes: [Blog],
+  mdx: {
+    remarkPlugins: [remarkGfm],
+    rehypePlugins: [
+      rehypeSlug,
+      rehypeCodeTitles,
+      rehypePrism,
+      [
+        rehypeAutolinkHeadings,
+        {
+          properties: {
+            className: ["anchor"],
+          },
+        },
+      ],
+    ],
+  },
+});
+```
+
+## 使用
+
+### 数据及定义
+
+完成配置后，即可在 **Next.js** 中直接导入相关数据及定义，以主页为例，将 **allBlogs** 按照时间排序并截取前三篇展示：
+
+```tsx:index.tsx
+import { allBlogs } from "contentlayer/generated";
+
+export const getStaticProps = () => {
+  const blogs = allBlogs
+    .sort((a, b) => {
+      return compareDesc(new Date(a.date), new Date(b.date));
+    })
+    .slice(0, 3);
+
+  // ...
+
+  return { props: { blogs } };
+};
+```
+
+### Markdown 渲染
+
+- 使用 `useMDXComponent()` 解析 `blog.body.code`
+- 将获取的 **MDXContent** 作为组件在 **Next.js** 中使用
+
+```tsx:blogs/[slug].tsx
+import { useMDXComponent } from "next-contentlayer/hooks";
+
+const BlogLayout = ({
+  blog,
+}: InferGetStaticPropsType<typeof getStaticProps>) => {
+  const MDXContent = useMDXComponent(blog.body.code);
+  return (
+    <>
+      <article className="mx-auto max-w-2xl pt-8 pb-16">
+        <MDXContent />
+      </article>
+    </>
+  );
+};
+```
+
+---
+
+# Next.js
+
+**Next.js** 最重要的工作就是拿到所有文章及标签渲染页面
+
+## blogs/[slug].tsx
+
+在前面定义 **Blog** 时，有一个属于 **computedFields** 的属性：
+
+```typescript:contentlayer.config.ts
+computedFields: {
+    url: {
+      type: "string",
+      resolve: (blog) => `/blogs/${blog._raw.flattenedPath}`,
+    },
+  },
+```
+
+现在这个 **url** 属性可以作为与 `params.slug` 比较的依据，在 **allBlogs** 中找到目标 **blog**
+
+```tsx:blogs/[slug].tsx
+export async function getStaticPaths() {
+  const paths = allBlogs.map((post) => post.url);
+  return {
+    paths,
+    fallback: false,
+  };
+}
+
+export async function getStaticProps({ params }) {
+  const blog = allBlogs.find((blog) => blog._raw.flattenedPath === params.slug);
+  return {
+    props: {
+      blog,
+    },
+  };
+}
+```
+
+## tags/[slug].tsx
+
+对于标签页面的处理稍微复杂一些，因为 **Contentlayer** 没有生成 **allTags** 数据，所以主要做法为：
+
+- 二层遍历 **allBlogs** 及 **blog.tags** ，使用 **Set** 记录所有出现过的 **tag**
+- 对于没有出现过的 **tag** ，将生成的路径保存在 **paths** 数组中
+- 标签可能存在空格，所以需要对生成路径特殊处理
+
+```tsx:tags/[slug].tsx
+export async function getStaticPaths() {
+  const paths = [];
+  const pathSet = new Set<string>();
+  allBlogs.forEach((blog) => {
+    blog.tags.forEach((tag) => {
+      if (!pathSet.has(tag.title)) {
+        pathSet.add(tag.title);
+        paths.push(getTagUrl(tag.title));
+      }
+    });
+  });
+
+  return {
+    paths,
+    fallback: false,
+  };
+}
+
+export async function getStaticProps({ params }) {
+  const target = params.slug.replace("_", " ");
+  const blogs = allBlogs
+    .filter((blog) => blog.tags.some((tag) => tag.title === target))
+    .sort((a, b) => {
+      return compareDesc(new Date(a.date), new Date(b.date));
+    });
+
+  return {
+    props: {
+      tag: target,
+      blogs,
+    },
+  };
+}
+```
+
+```ts:utils/tagUtils.ts
+export function getTagUrl(title: string) {
+  return `/tags/${title}`.replaceAll(" ", "_");
+}
+```
+
+---
+
+# 暗黑主题
+
+暗黑主题主要使用 **next-theme** 和 **tailwind** 集成来实现：
+## 配置
+
+- 在 **tailwind.config.js** 中使用 `darkMode: "class"`
+- 在 **_app.tsx** 中使用 `<ThemeProvider>` 包裹，并设置 `attribute="class"`
+
+```javascript:tailwind.config.js
+module.exports = {
+  // ... ...
+  darkMode: "class",
+}
+```
+
+```tsx:_app.tsx
+function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <ThemeProvider attribute="class">
+      <Component {...pageProps} />
+    </ThemeProvider>
+  );
+}
+```
+
+## ThemeButton
+设计一个组件来完成主题的切换：
+- 通过 `useEffect()` 判断组件是否挂载完成，完成按键渲染
+- 使用 `useTheme()` 获取当前主题以及设置主题的 **API**
+
+```tsx:components/ThemeButton.tsx
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
+
+interface IProps {
+  className?: string;
+}
+
+const ThemeButton: React.FC<IProps> = ({ className }) => {
+  const [mounted, setMounted] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
+
+  // After mounting, we have access to the theme
+  useEffect(() => setMounted(true), []);
+
+  return (
+    <button
+      aria-label="Toggle Dark Mode"
+      type="button"
+      className={`w-9 h-9 bg-gray-200 rounded-lg dark:bg-gray-600 flex items-center justify-center  hover:ring-2 ring-gray-300  transition-all ${className}`}
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+    >
+      {mounted && (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          className="w-5 h-5 text-gray-800 dark:text-gray-200"
+        >
+          {resolvedTheme === "dark" ? (
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+            />
+          ) : (
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+            />
+          )}
+        </svg>
+      )}
+    </button>
+  );
+};
+
+export default ThemeButton;
+
+```
+
+---
+
+# Last but not least
+
+该文只记录了实现 **blog** 的一小部分，具体实现以及前端的样式可以在 [github](https://github.com/Ken-HH24/next-blog) 浏览，同时一些额外的模块和功能也还在探索建设中 ...

@@ -34,7 +34,7 @@ const BlogPost: React.FC<IProps> = ({ blog }) => {
         <div className="text-sm text-slate-600 mb-2">
           {format(parseISO(blog.date), "LLLL d, yyyy")}
         </div>
-        <p className="text-gray-600 dark:text-gray-400 line-clamp-2 font-medium">
+        <p className="text-gray-600 dark:text-gray-400 line-clamp-2 font-medium tracking-wide">
           {blog.description}
         </p>
       </div>

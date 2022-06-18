@@ -33,7 +33,6 @@ export default function Home({
   blogs,
   popularTagArr,
   tagCountMap,
-  tagUrlMap,
 }: InferGetStaticPropsType<typeof getStaticProps>) {
   return (
     <Container>
