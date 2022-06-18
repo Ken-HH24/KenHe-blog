@@ -26,6 +26,10 @@ export const Blog = defineDocumentType(() => ({
       description: "The title of the blog",
       required: true,
     },
+    description: {
+      type: "string",
+      description: "The description of the blog",
+    },
     date: {
       type: "date",
       description: "The date of the blog",
@@ -34,6 +38,7 @@ export const Blog = defineDocumentType(() => ({
     tags: {
       type: "list",
       of: Tag,
+      default: [],
     },
   },
   computedFields: {

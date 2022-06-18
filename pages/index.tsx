@@ -5,14 +5,23 @@ import Container from "../components/Container";
 import BlogPostCard from "../components/BlogPostCard";
 import Link from "next/link";
 import { InferGetStaticPropsType } from "next";
+import TagGroup from "components/TagGrounp";
+import { getTagsInfo, getTagUrl } from "utils/tagUtils";
+import TagCard from "components/TagCard";
+import ReadAllLink from "components/ReadAllLink";
 
 export const getStaticProps = () => {
+  const { tagCountMap, tagTitleArr, tagUrlMap } = getTagsInfo();
   const blogs = allBlogs
     .sort((a, b) => {
       return compareDesc(new Date(a.date), new Date(b.date));
     })
     .slice(0, 3);
-  return { props: { blogs } };
+
+  const popularTagArr = tagTitleArr
+    .sort((a, b) => tagCountMap[b] - tagCountMap[a])
+    .slice(0, 3);
+  return { props: { blogs, popularTagArr, tagCountMap, tagUrlMap } };
 };
 
 const GRADIENTS = [
@@ -23,6 +32,9 @@ const GRADIENTS = [
 
 export default function Home({
   blogs,
+  popularTagArr,
+  tagCountMap,
+  tagUrlMap,
 }: InferGetStaticPropsType<typeof getStaticProps>) {
   return (
     <Container>
@@ -60,25 +72,22 @@ export default function Home({
             <BlogPostCard key={index} blog={blog} gradient={GRADIENTS[index]} />
           ))}
         </div>
-        <Link href="/blog">
-          <a className="flex mt-8 text-gray-600 dark:text-gray-400 leading-7 rounded-lg hover:text-gray-800 dark:hover:text-gray-200 transition-all h-6">
-            Read all blogs
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              className="h-6 w-6 ml-1"
-            >
-              <path
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17.5 12h-15m11.667-4l3.333 4-3.333-4zm3.333 4l-3.333 4 3.333-4z"
-              />
-            </svg>
-          </a>
-        </Link>
+        <ReadAllLink title="Read all blogs" url="/blog" />
+
+        <h3 className="font-bold text-2xl md:text-4xl tracking-tight mb-6 text-black dark:text-white">
+          Popular tags
+        </h3>
+        <TagGroup className="flex flex-wrap w-full gap-6">
+          {popularTagArr.map((tag) => (
+            <TagCard
+              key={tag}
+              title={tag}
+              url={getTagUrl(tag)}
+              num={tagCountMap[tag]}
+            />
+          ))}
+        </TagGroup>
+        <ReadAllLink title="Read all tags" url="/tag" />
       </div>
     </Container>
   );

@@ -2,8 +2,12 @@
 title: "How I Became a Software Engineer (From Designer to Developer) Became a Software Engineer (From Designer to Developer)"
 date: 2021-12-24
 tags:
-  - My First Tag
-  - Another Tag
+  - title: React
+  - title: Tailwind
+  - title: Vue
+  - title: Javascript
+  - title: python
+  - title: first blog
 ---
 
 How did I go from a designer to a developer? In this post, I'll share my overnight success story – ten years in the making. First, we have to go way back to 2007.

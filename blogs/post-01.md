@@ -1,6 +1,9 @@
 ---
 title: Lorem Ipsum
 date: 2021-12-24
+tags:
+  - title: React
+  - title: Tailwind
 ---
 
 # preview

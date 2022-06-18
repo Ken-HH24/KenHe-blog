@@ -6,9 +6,13 @@ import { useMDXComponent } from "next-contentlayer/hooks";
 import { InferGetStaticPropsType } from "next";
 import React from "react";
 import ThemeButton from "components/ThemeButton";
+import TagGroup from "components/TagGrounp";
+import TagCard from "components/TagCard";
+import { getTagUrl } from "utils/tagUtils";
 
 export async function getStaticPaths() {
   const paths = allBlogs.map((post) => post.url);
+  console.log(paths);
   return {
     paths,
     fallback: false,
@@ -65,6 +69,15 @@ const BlogLayout = ({
         <BlogLayoutHeader />
         <div className="mb-6 text-center">
           <h1 className="mb-4 text-3xl font-bold">{blog.title}</h1>
+          <TagGroup className="flex flex-wrap justify-center gap-4 my-4">
+            {blog.tags.map((tag) => (
+              <TagCard
+                key={tag.title}
+                title={tag.title}
+                url={getTagUrl(tag.title)}
+              />
+            ))}
+          </TagGroup>
           <time dateTime={blog.date} className="text-sm text-slate-600">
             {format(parseISO(blog.date), "LLLL d, yyyy")}
           </time>
