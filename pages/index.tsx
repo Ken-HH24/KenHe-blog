@@ -54,7 +54,7 @@ export default function Home({
           <div className="w-[80px] sm:w-[190px] relative mb-8 sm:mb-0 mr-auto">
             <Image
               alt="Alex He"
-              src="/avatar.png"
+              src="/avatar.PNG"
               width={190}
               height={190}
               className="rounded-full filter"
