@@ -8,6 +8,7 @@ import TagGroup from "components/TagGrounp";
 import { getTagsInfo, getTagUrl } from "utils/tagUtils";
 import TagCard from "components/TagCard";
 import ReadAllLink from "components/ReadAllLink";
+import Avatar from "../public/avatar.png";
 
 export const getStaticProps = () => {
   const { tagCountMap, tagTitleArr, tagUrlMap } = getTagsInfo();
@@ -47,15 +48,14 @@ export default function Home({
               {/* <span className="font-semibold">Vercel</span> */}
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-16">
-              A graduate in China, interested in Fontend Development. Write blogs to record work and life.
+              A graduate in China, interested in Fontend Development. Write
+              blogs to record work and life.
             </p>
           </div>
           <div className="w-[80px] sm:w-[190px] relative mb-8 sm:mb-0 mr-auto">
             <Image
               alt="Alex He"
-              height={190}
-              width={190}
-              src="/avatar.png"
+              src={Avatar}
               className="rounded-full filter"
             />
           </div>

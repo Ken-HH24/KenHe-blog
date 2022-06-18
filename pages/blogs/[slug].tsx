@@ -60,7 +60,7 @@ const BlogLayout = ({
 }: InferGetStaticPropsType<typeof getStaticProps>) => {
   const MDXContent = useMDXComponent(blog.body.code);
   return (
-    <>
+    <div className="bg-gray-50 dark:bg-gray-900 flex flex-col justify-center px-8">
       <Head>
         <title>{blog.title}</title>
       </Head>
@@ -85,7 +85,7 @@ const BlogLayout = ({
           <MDXContent />
         </div>
       </article>
-    </>
+    </div>
   );
 };
 
