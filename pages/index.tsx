@@ -8,7 +8,6 @@ import TagGroup from "components/TagGrounp";
 import { getTagsInfo, getTagUrl } from "utils/tagUtils";
 import TagCard from "components/TagCard";
 import ReadAllLink from "components/ReadAllLink";
-import Avatar from "../public/avatar.png";
 
 export const getStaticProps = () => {
   const { tagCountMap, tagTitleArr, tagUrlMap } = getTagsInfo();
@@ -55,7 +54,9 @@ export default function Home({
           <div className="w-[80px] sm:w-[190px] relative mb-8 sm:mb-0 mr-auto">
             <Image
               alt="Alex He"
-              src={Avatar}
+              src="/avatar.png"
+              width={190}
+              height={190}
               className="rounded-full filter"
             />
           </div>
