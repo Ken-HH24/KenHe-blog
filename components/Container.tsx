@@ -50,7 +50,7 @@ const Container: React.FC<IProps> = ({ children }) => {
       </div>
       <main
         id="skip"
-        className="flex flex-col justify-center px-8 bg-gray-50 dark:bg-gray-900"
+        className="flex flex-col justify-center px-8 bg-gray-50 dark:bg-gray-900 overflow-hidden"
       >
         {children}
       </main>

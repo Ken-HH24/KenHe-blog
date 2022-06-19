@@ -60,32 +60,34 @@ const BlogLayout = ({
 }: InferGetStaticPropsType<typeof getStaticProps>) => {
   const MDXContent = useMDXComponent(blog.body.code);
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 flex flex-col justify-center px-8">
+    <>
       <Head>
         <title>{blog.title}</title>
       </Head>
-      <article className="mx-auto max-w-2xl pt-8 pb-16">
-        <BlogLayoutHeader />
-        <div className="mb-6 text-center">
-          <h1 className="mb-4 text-3xl font-bold">{blog.title}</h1>
-          <TagGroup className="flex flex-wrap justify-center gap-4 my-4">
-            {blog.tags.map((tag) => (
-              <TagCard
-                key={tag.title}
-                title={tag.title}
-                url={getTagUrl(tag.title)}
-              />
-            ))}
-          </TagGroup>
-          <time dateTime={blog.date} className="text-sm text-slate-600">
-            {format(parseISO(blog.date), "LLLL d, yyyy")}
-          </time>
-        </div>
-        <div className="prose dark:prose-dark">
-          <MDXContent />
-        </div>
-      </article>
-    </div>
+      <div className="bg-gray-50 dark:bg-gray-900 px-8">
+        <article className="mx-auto max-w-2xl pt-8 pb-16">
+          <BlogLayoutHeader />
+          <div className="mb-6 text-center">
+            <h1 className="mb-4 text-3xl font-bold">{blog.title}</h1>
+            <TagGroup className="flex flex-wrap justify-center gap-4 my-4">
+              {blog.tags.map((tag) => (
+                <TagCard
+                  key={tag.title}
+                  title={tag.title}
+                  url={getTagUrl(tag.title)}
+                />
+              ))}
+            </TagGroup>
+            <time dateTime={blog.date} className="text-sm text-slate-600">
+              {format(parseISO(blog.date), "LLLL d, yyyy")}
+            </time>
+          </div>
+          <div className="prose dark:prose-dark">
+            <MDXContent />
+          </div>
+        </article>
+      </div>
+    </>
   );
 };
 
