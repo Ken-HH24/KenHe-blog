@@ -1,5 +1,6 @@
 import React, { ReactNode } from "react";
 import { TagCardProps } from "./TagCard";
+import { shuffle } from "lodash";
 
 interface IProps {
   className?: string;
@@ -17,6 +18,8 @@ const COLORS = [
 const LEN = COLORS.length;
 
 const TagGroup: React.FC<IProps> = ({ children, className }) => {
+  const colors = shuffle(COLORS);
+
   return (
     <div className={className}>
       {React.Children.map(children, (child, index) => {
@@ -24,7 +27,7 @@ const TagGroup: React.FC<IProps> = ({ children, className }) => {
           child as React.FunctionComponentElement<TagCardProps>;
         const { className } = childrenElement.props;
         return React.cloneElement(childrenElement, {
-          className: `${COLORS[index % LEN]} ${className}`,
+          className: `${colors[index % LEN]} ${className}`,
         });
       })}
     </div>
