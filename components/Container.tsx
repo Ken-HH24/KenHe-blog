@@ -1,6 +1,7 @@
 import NextLink from "next/link";
 import { useRouter } from "next/router";
 import React, { ReactNode } from "react";
+import MobileMenu from './MobileMenu';
 import ThemeButton from "./ThemeButton";
 
 interface NavItemProps {
@@ -19,7 +20,7 @@ const NavItem: React.FC<NavItemProps> = ({ href, text }) => {
           isActive
             ? "font-semibold text-gray-800 dark:text-gray-200"
             : "font-normal text-gray-600 dark:text-gray-400"
-        } 'hidden md:inline-block p-1 sm:px-3 sm:py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-all'`}
+        } hidden md:inline-block p-1 sm:px-3 sm:py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-all'`}
       >
         <span className="capsize">{text}</span>
       </a>
@@ -40,7 +41,7 @@ const Container: React.FC<IProps> = ({ children }) => {
             Skip to content
           </a>
           <div className="ml-[-0.60rem]">
-            {/* <MobileMenu /> */}
+            <MobileMenu />
             <NavItem href="/" text="Home" />
             <NavItem href="/blog" text="Blog" />
             <NavItem href="/tag" text="Tag" />
