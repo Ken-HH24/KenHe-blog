@@ -230,3 +230,7 @@ table {
 .prose .callout > p {
   margin: 0 !important;
 }
+
+.prose {
+  max-width: 42rem;
+}
