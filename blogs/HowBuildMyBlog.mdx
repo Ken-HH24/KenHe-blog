@@ -1,12 +1,14 @@
 ---
 title: "How I build my Next.js blog"
 date: 2022-06-18
-description: "从leerob.io中学习并获取灵感，使用 Next.js + Contentlayer + tailwind 建立blog，记录一些work and life"
+description: "从leerob.io中学习并获取灵感, 使用 Next.js + Contentlayer + tailwind 构建blog"
 tags:
   - title: Next.js
 ---
 
-Hexo, Hugo, Docusaurus 等一直是出色的博客框架，也有漂亮的主题可以选择。但是在可定制化方面一直欠缺，在看到 **leerob** 的博客后发现，使用 **Next.js** 作为建站框架，**Contentlayer** 作为内容管理工具，完美契合页面和功能自定义，内容直接输出于 **Markdown** 的需求。
+Hexo, Hugo, Docusaurus 等是出色的博客框架，也有漂亮的主题可以选择。但是在可定制化方面一直欠缺，在看到 **leerob** 的博客后发现，使用 **Next.js** 作为建站框架，**Contentlayer** 作为内容管理工具，完美契合页面和功能自定义，内容直接输出于 **Markdown** 的需求。
+
+<AnchorList />
 
 # Contentlayer
 
@@ -238,13 +240,14 @@ export function getTagUrl(title: string) {
 
 ---
 
-# 暗黑主题
+# Dark mode
 
 暗黑主题主要使用 **next-theme** 和 **tailwind** 集成来实现：
+
 ## 配置
 
 - 在 **tailwind.config.js** 中使用 `darkMode: "class"`
-- 在 **_app.tsx** 中使用 `<ThemeProvider>` 包裹，并设置 `attribute="class"`
+- 在 **\_app.tsx** 中使用 `<ThemeProvider>` 包裹，并设置 `attribute="class"`
 
 ```javascript:tailwind.config.js
 module.exports = {
@@ -264,7 +267,9 @@ function MyApp({ Component, pageProps }: AppProps) {
 ```
 
 ## ThemeButton
+
 设计一个组件来完成主题的切换：
+
 - 通过 `useEffect()` 判断组件是否挂载完成，完成按键渲染
 - 使用 `useTheme()` 获取当前主题以及设置主题的 **API**
 
