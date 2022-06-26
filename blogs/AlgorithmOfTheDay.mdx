@@ -1,0 +1,58 @@
+---
+title: "Algorithm of the day"
+date: 2022-06-26
+description: "记录一些算法题思路"
+tags:
+  - title: Algorithm
+---
+
+# 黑名单中的随机数
+
+- 题目链接：[Leetcode](https://leetcode.cn/problems/random-pick-with-blacklist/)
+
+## 思路
+- 题目给出了主要两个限制：
+    - `0 <= blacklist.length <= min(105, n - 1)`
+    - `1 <= n <= 10e9`
+- 如果使用 `Map` 将白名单数字全部映射，会出现 `javascript heap out of memory` 错误
+- 假设 `m = blacklist.length` ，那么 `n-m` 将是白名单的个数
+- `[0, n-m)` 范围的白名单数字可以不作映射，直接由随机数生成；而在此范围的黑名单数字可以映射到 `[n-m, n-1]` 范围的白名单数字，存储在 `Map` 中
+- 最后 `pick()` 函数使用 `Math.random()` 随机生成 `[0, n-m)` 的数字，并取映射或者原值
+
+## 代码
+
+```javascript
+/**
+ * @param {number} n
+ * @param {number[]} blacklist
+ */
+var Solution = function (n, blacklist) {
+  const m = blacklist.length;
+  const black = new Set();
+  this.bound = n - m;
+  for (const b of blacklist) {
+    if (b >= this.bound) {
+      black.add(b);
+    }
+  }
+  let w = this.bound;
+  this.mp = new Map();
+  for (const b of blacklist) {
+    if (b < this.bound) {
+      while (black.has(w)) {
+        w++;
+      }
+      this.mp.set(b, w);
+      w++;
+    }
+  }
+};
+
+/**
+ * @return {number}
+ */
+Solution.prototype.pick = function () {
+  const ran = Math.floor(Math.random() * this.bound);
+  return this.mp.get(ran) || ran;
+};
+```

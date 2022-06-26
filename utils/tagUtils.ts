@@ -10,6 +10,7 @@ const TAG_COLOR = [
 
 const TAG_COLOR_INDEX_MAP = {
   "Next.js": 0,
+  "Algorithm": 1,
 };
 
 export function getTagUrl(title: string) {
