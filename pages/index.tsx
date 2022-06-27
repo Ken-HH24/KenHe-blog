@@ -42,13 +42,12 @@ export default function Home({
             <h1 className="font-bold text-3xl md:text-5xl tracking-tight mb-1 text-black dark:text-white">
               Alex He
             </h1>
-            <h2 className="text-gray-700 dark:text-gray-200 mb-4">
+            {/* <h2 className="text-gray-700 dark:text-gray-200 mb-4">
               A fontend developer
-              {/* <span className="font-semibold">Vercel</span> */}
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-16">
-              A graduate in China, interested in Fontend Development. Write
-              blogs to record work and life.
+              <span className="font-semibold">Vercel</span>
+            </h2> */}
+            <p className="text-gray-600 dark:text-gray-400 mb-16 mt-8">
+              A fontend developer in China. Write blogs to record work and life.
             </p>
           </div>
           <div className="w-[80px] sm:w-[190px] relative mb-8 sm:mb-0 mr-auto">
