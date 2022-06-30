@@ -36,7 +36,12 @@ const BlogPostCard: React.FC<IProps> = ({ blog, gradient }) => {
               />
             </svg>
             <span className="ml-2 align-baseline capsize">
-              {format(parseISO(blog.date), "yyyy.MM.dd")}
+              {format(
+                parseISO(
+                  blog.updated_date ? blog.updated_date : blog.created_date
+                ),
+                "yyyy.MM.dd"
+              )}
             </span>
           </div>
         </div>
@@ -46,4 +51,3 @@ const BlogPostCard: React.FC<IProps> = ({ blog, gradient }) => {
 };
 
 export default BlogPostCard;
-

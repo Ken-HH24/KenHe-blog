@@ -67,7 +67,7 @@ const BlogLayout = ({
       <div className="bg-gray-50 dark:bg-gray-900 px-8">
         <article className="mx-auto max-w-2xl pt-8 pb-16">
           <BlogLayoutHeader />
-          <div className="mb-6 text-center">
+          <div className="mb-6 text-center flex flex-col items-center">
             <h1 className="mb-4 text-3xl font-bold">{blog.title}</h1>
             <TagGroup className="flex flex-wrap justify-center gap-4 my-4">
               {blog.tags.map((tag) => (
@@ -78,9 +78,20 @@ const BlogLayout = ({
                 />
               ))}
             </TagGroup>
-            <time dateTime={blog.date} className="text-sm text-slate-600">
-              {format(parseISO(blog.date), "LLLL d, yyyy")}
+            <time
+              dateTime={blog.created_date}
+              className="text-sm text-slate-600 mt-2"
+            >
+              Created at {format(parseISO(blog.created_date), "LLLL d, yyyy")}
             </time>
+            {blog.updated_date && (
+              <time
+                dateTime={blog.updated_date}
+                className="text-sm text-slate-600 mt-2"
+              >
+                Updated at {format(parseISO(blog.updated_date), "LLLL d, yyyy")}
+              </time>
+            )}
           </div>
           <div className="prose dark:prose-dark">
             <MDXContent />

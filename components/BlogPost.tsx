@@ -32,7 +32,15 @@ const BlogPost: React.FC<IProps> = ({ blog }) => {
           </TagGroup>
         )}
         <div className="text-sm text-slate-600 mb-2">
-          {format(parseISO(blog.date), "LLLL d, yyyy")}
+          {blog.updated_date ? (
+            <span>
+              Updated at {format(parseISO(blog.updated_date), "LLLL d, yyyy")}
+            </span>
+          ) : (
+            <span>
+              Created at {format(parseISO(blog.created_date), "LLLL d, yyyy")}
+            </span>
+          )}
         </div>
         <p className="text-gray-600 dark:text-gray-400 line-clamp-2 font-medium tracking-wide">
           {blog.description}

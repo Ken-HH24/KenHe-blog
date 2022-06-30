@@ -30,10 +30,14 @@ export const Blog = defineDocumentType(() => ({
       type: "string",
       description: "The description of the blog",
     },
-    date: {
+    created_date: {
       type: "date",
-      description: "The date of the blog",
+      description: "The create date of the blog",
       required: true,
+    },
+    updated_date: {
+      type: "date",
+      description: "The update date of the blog",
     },
     tags: {
       type: "list",

@@ -13,7 +13,10 @@ export const getStaticProps = () => {
   const { tagCountMap, tagTitleArr, tagUrlMap } = getTagsInfo();
   const blogs = allBlogs
     .sort((a, b) => {
-      return compareDesc(new Date(a.date), new Date(b.date));
+      return compareDesc(
+        new Date(a.updated_date ? a.updated_date : a.created_date),
+        new Date(b.updated_date ? b.updated_date : b.created_date)
+      );
     })
     .slice(0, 3);
 
