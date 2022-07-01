@@ -1,6 +1,7 @@
 ---
 title: "Algorithm of the day"
 created_date: 2022-06-26
+updated_date: 2022-07-01
 description: "记录一些算法题思路"
 tags:
   - title: Algorithm
@@ -11,9 +12,10 @@ tags:
 - 题目链接：[Leetcode](https://leetcode.cn/problems/random-pick-with-blacklist/)
 
 ## 思路
+
 - 题目给出了主要两个限制：
-    - `0 <= blacklist.length <= min(105, n - 1)`
-    - `1 <= n <= 10e9`
+  - `0 <= blacklist.length <= min(105, n - 1)`
+  - `1 <= n <= 10e9`
 - 如果使用 `Map` 将白名单数字全部映射，会出现 `javascript heap out of memory` 错误
 - 假设 `m = blacklist.length` ，那么 `n-m` 将是白名单的个数
 - `[0, n-m)` 范围的白名单数字可以不作映射，直接由随机数生成；而在此范围的黑名单数字可以映射到 `[n-m, n-1]` 范围的白名单数字，存储在 `Map` 中
@@ -21,7 +23,7 @@ tags:
 
 ## 代码
 
-```javascript
+```javascript:javascript
 /**
  * @param {number} n
  * @param {number[]} blacklist
@@ -55,4 +57,74 @@ Solution.prototype.pick = function () {
   const ran = Math.floor(Math.random() * this.bound);
   return this.mp.get(ran) || ran;
 };
+```
+
+---
+
+# 为运算表达式设计优先级
+
+- 题目链接：[Leetcode](https://leetcode.cn/problems/different-ways-to-add-parentheses/)
+
+## 思路
+
+- 很纯粹的暴力搜索题目，关键难点在于状态保存，之前没有遇到过 `dp[l][r] = []` 这种建模形式，所以一开始无从下手
+- 首先将数字与运算符拆分放入数组中，然后以运算符为界，`dp[l][r] = []int{ dp[l][k-1] operator(k) dp[k+1][r] }`
+- 因为数字与运算符已经被拆分，所以循环里都以 2 为间隔，同时区间长度以 3 开始增长到拆分数组 `ops` 的长度
+
+```go:golang
+package main
+
+import "unicode"
+
+var ADDITION, SUBSTRACTION, MULTIPLICATION = -1, -2, -3
+
+func diffWaysToCompute(expression string) []int {
+	ops := []int{}
+	for i, n := 0, len(expression); i < n; {
+		if unicode.IsDigit(rune(expression[i])) {
+			x := 0
+			for ; i < n && unicode.IsDigit(rune(expression[i])); i++ {
+				x = x*10 + int(expression[i]-'0')
+			}
+			ops = append(ops, x)
+		} else {
+			if expression[i] == '+' {
+				ops = append(ops, ADDITION)
+			} else if expression[i] == '-' {
+				ops = append(ops, SUBSTRACTION)
+			} else {
+				ops = append(ops, MULTIPLICATION)
+			}
+			i++
+		}
+	}
+
+	n := len(ops)
+	dp := make([][][]int, n)
+	for i, v := range ops {
+		dp[i] = make([][]int, n)
+		dp[i][i] = []int{v}
+	}
+
+	for size := 3; size <= n; size++ {
+		for l, r := 0, size-1; r < n; l += 2 {
+			for k := l + 1; k < r; k += 2 {
+				for _, x := range dp[l][k-1] {
+					for _, y := range dp[k+1][r] {
+						if ops[k] == ADDITION {
+							dp[l][r] = append(dp[l][r], x+y)
+						} else if ops[k] == SUBSTRACTION {
+							dp[l][r] = append(dp[l][r], x-y)
+						} else {
+							dp[l][r] = append(dp[l][r], x*y)
+						}
+					}
+				}
+			}
+			r += 2
+		}
+	}
+
+	return dp[0][n-1]
+}
 ```
