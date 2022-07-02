@@ -1,0 +1,657 @@
+---
+title: "What I have learned being an intern"
+created_date: 2022-07-02
+description: "回顾实习的三个多月，总结个人成长"
+tags:
+  - title: work
+---
+
+今年上半年作为前端开发实习了三个多月，完成了三四个需求任务，结识到一群优秀的同事，让我成长和收获了许多。
+
+# 微前端
+
+## 背景及意义
+
+微前端的出现本质上是为了解决 “巨石应用” ，将一个应用以功能需求切分成更小的系统，由不同的团队来进行开发，测试，与发布。一个基本的微前端框架应该具备以下几个能力：
+
+- 加载：将子应用正确的加载到 HTML 中
+- 沙箱隔离：建立沙箱环境来避免各个子应用对当前环境造成副作用，如定时器，全局变量，css 样式
+- 路由调度：保证子应用之间的路由不受干扰，维护主应用与子应用间的路由关系
+
+## 示例
+
+社区的微前端解决方案主要有: single-spa, qiankun, Garfish 等。这里以 Garfish 为例：
+
+### 主应用
+
+微前端需要一个基座应用来创建运行环境，如下面代码所示，通过 `Garfish.run()` 做了以下事情：
+
+- 提供一个 `id=subApp` 的 `<div />` 标签挂载点
+- 设置主应用的路由 `basename="/"`， 子应用被激活的路由分别为 `/project1` 与 `/project2`
+- 设置子应用的加载路径，分别是端口 3001 和 3002
+
+```tsx:main/src/app.tsx
+const App = () => {
+  useEffect(() => {
+    Garfish.run({
+      basename: "/",
+      domGetter: "#subApp",
+      apps: [
+        {
+          name: "project1",
+          activeWhen: "/project1",
+          entry: "http://localhost:3001",
+        },
+        {
+          name: "project2",
+          activeWhen: "/project2",
+          entry: "http://localhost:3002",
+        },
+      ],
+    });
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <div>main</div>
+      <div className="header">
+        <Link to="/project1">project1</Link>
+        <Link to="/project2">project2</Link>
+      </div>
+      <div id="subApp" />
+    </BrowserRouter>
+  );
+};
+```
+
+### 子应用
+
+#### 应用改造
+
+- 入口文件需要向外暴露一个 `provider()` 函数，提供 **render** 和 **destroy** 两个生命钩子，保证子应用的正常挂载与卸载
+- 子应用需要接收并设置主应用传来的 **basename**
+
+```tsx:sub-project1/src/index.tsx
+export const provider = () => ({
+  // @ts-ignore
+  render: ({ dom, basename }) => {
+    ReactDOM.render(
+      <React.StrictMode>
+        <App basename={basename} />
+      </React.StrictMode>,
+      dom.querySelector("#root")
+    );
+  },
+  // @ts-ignore
+  destroy: ({ dom, basename }) => {
+    ReactDOM.unmountComponentAtNode(
+      dom ? dom.querySelector("#root") : document.querySelector("#root")
+    );
+  },
+});
+
+```
+
+#### 构建配置修改
+
+按照官方文档，需要修改产物格式等配置
+
+```javascript:webpack.config.js
+const path = require("path");
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+const { CleanWebpackPlugin } = require("clean-webpack-plugin");
+const { ModuleFederationPlugin } = require("webpack").container;
+
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+module.exports = {
+  mode: "development",
+  entry: path.resolve(__dirname, "./src/index.tsx"),
+  devServer: {
+    port: 3001,
+    historyApiFallback: true,
+    static: {
+      directory: path.join(__dirname, "./public"),
+    },
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+    },
+  },
+  output: {
+    clean: isDevelopment ? false : true,
+    path: path.resolve(__dirname, "./dist"),
+    filename: "[name].[contenthash].js",
+    chunkFilename: "[name].[contenthash].js",
+    libraryTarget: "umd",
+    globalObject: "window",
+    publicPath: "http://localhost:3001/",
+  },
+
+  // ... ...
+};
+
+```
+
+#### 保证独立运行
+
+除了上述的修改，还应该保证子应用在非微前端模式下能够独立运行，而 Garfish 在运行时会创建一个 `window.__GARFISH__` 变量，因此在 **index.tsx** 里添加以下代码：
+
+```tsx:sub-project1/src/index.tsx
+// @ts-ignore
+if (!window.__GARFISH__) {
+  ReactDOM.render(<App basename="/" />, document.getElementById("root"));
+}
+```
+
+## 一些原理
+
+如 qiankun, Garfish 等微前端框架其实都是由 single-spa 发展而来，所以如果想要了解微前端的原理，阅读 single-spa 的源码是最容易入手的
+
+对于微前端的路由系统，single-spa 所做的其实就是监听浏览器的 **hashchange** 和 **popstate** 事件
+
+```javascript:single-spa/src/navigation/navigation-events.js
+function urlReroute() {
+  reroute([], arguments);
+}
+
+// We will trigger an app change for any routing events.
+window.addEventListener("hashchange", urlReroute);
+window.addEventListener("popstate", urlReroute);
+```
+
+然后通过 `getAppChange()` 函数，来获取哪些应用应该被加载，哪些应用应该被卸载，然后映射到不同的生命周期上，如 `appsToLoad` 被映射到 `toLoadPromise` 声明周期上
+
+```javascript:single-spa/src/navigation/reroute.js
+export function reroute(pendingPromises = [], eventArguments) {
+  // ... ...
+
+  const {
+    appsToUnload,
+    appsToUnmount,
+    appsToLoad,
+    appsToMount,
+  } = getAppChanges();
+
+  // ... ...
+
+  if (isStarted()) {
+    appChangeUnderway = true;
+    appsThatChanged = appsToUnload.concat(
+      appsToLoad,
+      appsToUnmount,
+      appsToMount
+    );
+    return performAppChanges();
+  } else {
+    appsThatChanged = appsToLoad;
+    return loadApps();
+  }
+
+  function loadApps() {
+    return Promise.resolve().then(() => {
+      const loadPromises = appsToLoad.map(toLoadPromise);
+
+      return (
+        Promise.all(loadPromises)
+          .then(callAllEventListeners)
+          // there are no mounted apps, before start() is called, so we always return []
+          .then(() => [])
+          .catch((err) => {
+            callAllEventListeners();
+            throw err;
+          })
+      );
+    });
+  }
+
+  // ... ...
+}
+```
+
+而在 `getAppChange()` 函数里，其基本原理依旧是通过 `shouldBeActive()` 函数比较当前 url 和子应用的路由激活规则来获取变化的子应用名单
+
+```javascript:single-spa/src/applications/apps.js
+export function getAppChanges() {
+  const appsToUnload = [],
+    appsToUnmount = [],
+    appsToLoad = [],
+    appsToMount = [];
+
+  // We re-attempt to download applications in LOAD_ERROR after a timeout of 200 milliseconds
+  const currentTime = new Date().getTime();
+
+  apps.forEach((app) => {
+    const appShouldBeActive =
+      app.status !== SKIP_BECAUSE_BROKEN && shouldBeActive(app);
+
+    // ... ...
+  }
+
+  // ... ...
+}
+```
+
+```javascript:single-spa/src/applications/app.helpers.js
+export function shouldBeActive(app) {
+  try {
+    return app.activeWhen(window.location);
+  } catch (err) {
+    handleAppError(err, app, SKIP_BECAUSE_BROKEN);
+    return false;
+  }
+}
+```
+
+## To learn
+
+1. Garfish 沙箱机制
+2. Garfish 插件系统
+3. single-spa 与 Garfish 如何加载应用 HTML
+
+---
+
+# Module Federation
+
+## 背景及意义
+
+微前端让 “巨石应用” 拆分成多个 “子应用” 并合理运行成为了可能，而在各个子应用之间如何复用组件代码，又是一个新的挑战。
+
+传统的方式是通过发布 npm 包来实现，但是在快速迭代的时代下，这种一方发布，另一方升级更新的模式效率非常低下。
+
+module federation 允许多个 webpack 编译产物之间共享模块，让各个构建应用充当容器，向外提供或者消费模块。
+
+## 使用
+
+### exposes
+
+作为提供者，主要通过 **ModuleFederationPlugin** 的 **exposes** 属性向外暴露组件
+
+```javascript:sub-project1/webpack.config.js
+module.exports = {
+  // ... ...
+  plugins: [
+    // ... ...
+    new ModuleFederationPlugin({
+      name: "app1",
+      filename: "remoteEntry.js",
+      exposes: {
+        "./button": "./src/button.tsx",
+      },
+    }),
+  ],
+}
+```
+
+### remotes
+
+作为消费者，主要通过 **ModuleFederationPlugin** 的 **remotes** 属性消费对应组件
+
+```javascript:sub-project2/webpack.config.js
+module.exports = {
+  plugins: [
+    new ModuleFederationPlugin({
+      name: "app2",
+      filename: "remoteEntry.js",
+      remotes: {
+        app1: "app1@http://localhost:3001/remoteEntry.js",
+      },
+    }),
+  ],
+};
+```
+
+在消费组件时，由于是异步 import，所以需要配合 `React.Lazy()` 和 `React.Suspense()` 使用
+
+```tsx:sub-project2/src/app.tsx
+import React from "react";
+import { BrowserRouter } from "react-router-dom";
+
+// @ts-ignore
+const Button = React.lazy(() => import("app1/button"));
+
+interface IProps {
+  basename: string;
+}
+
+const App: React.FC<IProps> = ({ basename }) => {
+  return (
+    <BrowserRouter basename={basename}>
+      <div>
+        Hello project2
+        <React.Suspense fallback="loading">
+          <Button />
+        </React.Suspense>
+      </div>
+    </BrowserRouter>
+  );
+};
+
+export default App;
+```
+
+---
+
+# Code
+
+## 对一段代码逻辑复用的思考
+
+在完成需求时曾遇到过一个字符串拼接的函数：
+
+```typescript
+function getString(year: number, age: number, score: number) {
+  let res = "";
+  if (year === 3) {
+    res += "3 years";
+  } else if (year === 4) {
+    res += "4 years";
+  } else if (year >= 5) {
+    res += "over 5 years";
+  }
+
+  if (age >= 6 && age <= 12) {
+    res += "child";
+  } else if (age > 12 && age < 18) {
+    res += "teenager";
+
+    if (score >= 90) {
+      res += "perfect";
+    }
+  } else if (age >= 18) {
+    res += "adult";
+
+    if (score >= 85) {
+      res += "excellent";
+    }
+  }
+
+  return res;
+}
+```
+
+很明显这是一段非常复杂的业务逻辑，而需求要求新增一个 `semester` 变量，在变量值不同的情况下以同样的组织形式，拼接不同内容的字符串，那么做法大概有以下几种：
+
+1. 保持原有的 `getString()` 函数不变，编写一个 `getString2()` 函数来满足新需求
+2. 维持原有 `getString()` 函数的组织逻辑，将字符串变量进行抽取，用设计模式中的模板模式进行重构
+3. 约定接口，利用面向对象中的多态来满足新需求
+
+方案一最为简单直观，但不能复用代码中原有的逻辑，且仅适用于特定需求，可扩展性低，所以不给予考虑
+
+### 模板模式
+
+- 参考 **《JavaScript 设计模式与开发实践》** 一书，可以使用模板模式对 `getString()` 函数的组织逻辑进行复用
+- 对于 `getString()` 里的字符串变量，设计接口将其聚合起来
+
+```typescript
+interface StringVariables {
+  year3: string;
+  year4: string;
+  yearOver5: string;
+  // ... ...
+}
+
+function getString(
+  // ... ...
+  strs: StringVariables
+) {
+  const {
+    year3,
+    // ... ...
+  } = strs;
+
+  let res = "";
+  if (year === 3) {
+    res += "3 years";
+  } else if () {
+    // ... ...
+  }
+
+  return res;
+}
+```
+
+- 而由于针对不同 `semester` 变量，字符串内容有所不同，因此编写多个函数输出不同字符串，最后由 `getStringTemplate()` 函数分发变量
+
+```typescript
+function template1(): StringVariables {
+  // ... ...
+}
+
+function template2(): StringVariables {
+  // ... ...
+}
+
+function getStringTemplate(semester: number) {
+  let strs;
+  if (semester >= 5) {
+    strs = template1();
+  } else {
+    strs = template2();
+  }
+
+  // ... ...
+
+  return getString(year, age, score, strs);
+}
+```
+
+#### 优点
+
+- 对组织逻辑进行了复用，以后需要对字符串内容进行修改，再设计另一个函数即可
+- 将原有散落在各个地方的字符串变量进行聚合，修改与维护更加直观
+
+#### 缺点
+
+- 对组织逻辑进行复用，让其与 `semester` 变量耦合，如果需要修改组织逻辑里面的判断逻辑，影响面会很大
+
+### 多态
+
+在不同情况下实现同一份相似的逻辑，很自然地就会想起多态，利用面向对象可以做到逻辑复用，同时保持可扩展性
+
+- 对于 `getString()` 的每一段子逻辑，抽象成接口中的一部分
+
+```typescript
+interface StringManager {
+  getYearStep1: () => string;
+  getYearStep2: () => string;
+  // ... ...
+}
+```
+
+- 根据不同业务需求编写类，实现该接口
+
+```typescript
+class StringManager1 implements StringManager {
+  getStringStep1() {
+    if (this.year === 3) {
+      return "year 3";
+    } else {
+      return "";
+    }
+  }
+
+  // ... ...
+}
+
+class StringManager2 implements StringManager {
+  getStringStep1() {
+    // ... ...
+  }
+}
+```
+
+- 最后根据利用多态，组织字符串
+
+```typescript
+function getString(semester: number) {
+  let stringManager;
+  if (semester >= 5) {
+    stringManager = new StringManager1();
+  } else {
+    stringManager = new StringManager2();
+  }
+
+  let res = "";
+  res += stringManager.getYearStep1();
+  res += stringManager.getYearStep2();
+  // ... ...
+
+  return res;
+}
+```
+
+#### 优点
+
+- 利用多态降低变量值与逻辑的耦合，维护高扩展性
+
+#### 缺点
+
+- 需要对原函数进行抽象改造，编码量大，需要充分测试
+
+---
+
+## 关于一个 MF 组件引发的思考
+
+在需求迭代下，组内设计了一个新的 Drawer 组件以替代旧的组件，同时利用 Module Federation 在各个子应用中共用。
+
+但是在上线后发现，该 Drawer 组件失去了许多原有功能特性，主要原因如下：
+
+1. 影响面评估不足，该 MF 组件在多个子应用场景中都有使用，测试没有覆盖到所有场景
+2. 组件的一些表现依赖于 `window.location` 等外部变量，而不是 `props` , 违反了高内聚低耦合
+3. 对旧的 Drawer 组件上下文了解不足，造成了作为 MF 组件, 上下文 Context 无法穿透等问题
+
+而在解决这些问题时，也学会了一些思路
+
+### 侵入性与脏逻辑
+
+组件其中一个丢失的功能就是在修改表单后没有触发外部环境的回调函数，原逻辑是通过 `props` 属性传入，但是由于组件设计之初没有考虑到所有应用场景，导致特殊情况下没有执行到某些回调函数
+
+解决方案主要有两个：
+
+1. 对 MF 组件改造，添加一个 `props` 属性 `onInfoSubmitSuccess()`
+2. 利用发布订阅模式，在 MF 组件修改表单成功后，通知对应环境触发回调函数
+
+这两个方案各有利弊：
+
+1. 添加属性会对原组件做侵入性的改造，与原有的 `onSubmitSuccess()` 之间表义会产生混淆，且造成属性深层次传递的情况
+2. 发布订阅模式能够简洁解决问题 (组件中原有一部分回调问题就是通过该模式解决)，但是在两个子应用之间 `subscribe()` 和 `emit()` 难以让其他开发者直观理解，很容易形成脏逻辑
+
+最后在两种方案之中选择了后者，这也是权衡多方面的决定，一部分是因为原有一些逻辑就是这样做的，另外也避免对组件做出过大的改动
+
+利用 **Garfish** 中的 **channel** 可以实现发布订阅模式，达到两个子应用通信的目的
+
+```tsx
+const App = () => {
+  const handleLogin = (userInfo) => {
+    console.log(`${userInfo.name} has login`);
+  };
+
+  useEffect(() => {
+    window?.Garfish.channel.on("login", handleLogin);
+    return () => {
+      window?.Garfish.channel.removeListener("login", handleLogin);
+    };
+  });
+};
+
+window.Garfish.channel.emit("login", data);
+```
+
+### 状态存储位置
+
+另一个造成组件功能缺失的原因是 MF 组件在相互调用过程中，上下文 Context 丢失，那么保留在原 Context 的状态势必要改变其存储位置，主要的方案有两个：
+
+1. 将状态提升一层，放在全局 Context
+2. 因状态只涉及一个关于菜单栏的 toolbar 逻辑，因此放入 session 中
+
+前者解决方式非常直观，但是进一步思考，仅仅是一个组件 toolbar 的状态，放入全局 Context 是否有一些大材小用了，而且是否会有称为脏数据的风险
+
+后者结合了 toolbar 状态，也更适合用 session 解决，当然在设计 hook 的时候，记得使用 `useEffect()` 清除状态
+
+```tsx
+const SESSION_KEY = "TOOLBAR_STATE";
+
+const useToolbar = (state) => {
+  useEffect(() => {
+    sessionStorage.setItem(SESSION_KEY, state);
+
+    return () => {
+      sessionStorage.removeItem(SESSION_KEY);
+    };
+  }, [state]);
+
+  // ... ...
+};
+```
+
+## 一些细节
+
+### 命名
+
+好的命名有利于其他开发者理解代码，也有助于维护系统的可扩展性
+
+如前面提到的针对 `semester` 变量有不同的字符串变量组，那么针对不同 `semester` , 其获取函数应该命名为什么？很直观的命名方法是：
+
+```typescript
+function getStringsInOldSemester() {
+  // ... ...
+}
+
+function getStringInNewSemester() {
+  // ... ...
+}
+```
+
+将其区分为新老 `semester` ，对于目前系统来说似乎并没有错。但是对于其他开发者来说，这个 `new` 意味着什么，似乎要深入到代码层面才能知道。而且面对日后新的业务需求，也更难扩展出其他相关的变量名
+
+因此应该切合系统实际情况，给予更加清晰的函数命名
+
+```typescript
+function getStringBeforeSemester5() {
+  // ... ...
+}
+
+function getStringInSemester5() {
+  // ... ...
+}
+```
+
+### \_.get 陷阱
+
+**lodash** 这个库提供了非常多优秀的常用函数给开发者使用， `_.get(object, path, [defaultValue])` 可以按照对应路径取值，同时防止解析路径中出现 `undefined` 的情况
+
+该函数可以被运用在解析请求获取的复杂数据结构，但是注意，官方文档中提到只有解析到 `value = undefined` 时，才会被 `defaultValue` 取代，当后端返回的字段存在 `null` ，那么不能被成功替换成 `defaultValue` ，依然有可能引发 JS 异常，而且很难排查
+
+解决办法可以使用 `||` 运算符，当然 **typescript** 中最新的 `??` 运算符显然更加合适
+
+```typescript
+async function getData() {
+  const data = await fetchData();
+  const defaultValue = 0;
+  const res = _.get(data, "a.b.c", defaultValue) ?? defaultValue;
+
+  return res;
+}
+```
+
+---
+
+# 除代码之外
+
+## 外部视角
+
+在刚开始工作时，无论是与产品，设计，还是研发同学打交道，有时候或多或少会出现 “我觉得这个没有必要” , “这个是不是可以不做” 的想法。但是我们通常是站在自己的角度看问题，自己来看或许是一个小问题，但是对于他人来说，可能是大问题。
+
+要想得到他人的正面反馈，首先需要获取外部视角，从 “别人想获得什么” 出发来思考问题，那么工作中所做出的贡献，也往往更加符合外界预期。
+
+## 不断学习
+
+一直学习这个话题估计已经被别人说烂了，而作为一个 **fontend developer** ，适当学习一些 **backend** 知识，如 **BFF** , **serverless**, 无论是对于技术交流，还是个人成长，都更加有利，总而言之还是 **keep studying**
+
+---
+
+# 参考资料
+
+- [Garfish 官方文档](https://www.garfishjs.org/)
+- [Lodash 中文文档](https://www.lodashjs.com/)
+- [字节跳动是如何落地微前端的](https://juejin.cn/post/7016900744695513125)
+- [一文通透讲解 webpack5 module federation](https://juejin.cn/post/7048125682861703181#heading-1)
