@@ -27,9 +27,9 @@ export const getStaticProps = () => {
 };
 
 const GRADIENTS = [
-  "from-[#D8B4FE] to-[#818CF8]",
-  "from-[#6EE7B7] via-[#3B82F6] to-[#9333EA]",
-  "from-[#FDE68A] via-[#FCA5A5] to-[#FECACA]",
+  "from-[#85fcee] via-[#b4bbd5] to-[#e971b8]",
+  "from-[#42d392] via-[#50b3bc] to-[#5e8dea]",
+  "from-[#fdf611] via-[#fecc62] to-[#fea8a7]",
 ];
 
 export default function Home({
