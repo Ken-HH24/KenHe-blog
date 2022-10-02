@@ -52,6 +52,12 @@ export default function Home({ blogs }: InferGetStaticPropsType<typeof getStatic
           ))}
         </div>
         <ReadAllLink title="Read all blogs" url="/blog" />
+        <h3 className="font-bold text-2xl md:text-4xl tracking-tight mb-6 text-black dark:text-white">Coming Next ... ...</h3>
+        <div className="flex flex-col">
+          <span className="mb-4">1. 可复用hook与业务逻辑分离</span>
+          <span className="mb-4">2. Formily</span>
+          <span className="mb-4">3. useRequest, React Dnd ...</span>
+        </div>
       </div>
     </Container>
   );
