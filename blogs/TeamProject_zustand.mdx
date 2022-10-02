@@ -289,4 +289,153 @@ const [offset, setOffset] = useStore((state) => [state.tableStore.offset, state.
 
 # 源码
 
-TODO
+## 入口
+
+我们传入 **zustand** `create API` 的函数，会经过内部的数个函数，最后由 `createStoreImpl` 负责 `store` 的创建
+
+1. `createImpl`
+2. `createStore`
+3. `createStoreImpl`
+
+```ts:src/react.ts
+const createImpl = <T>(createState: StateCreator<T, [], []>) => {
+  // 第一步传到这里
+  const api = typeof createState === 'function' ? createStore(createState) : createState
+
+  // ... ...
+}
+
+// zustand向外提供的create API
+const create = (<T>(createState: StateCreator<T, [], []> | undefined) =>
+  createState ? createImpl(createState) : createImpl) as Create
+```
+
+```ts:src/valina.ts
+// 第二步valina再做判断
+const createStore = ((createState) => createState ? createStoreImpl(createState) : createStoreImpl) as CreateStore
+
+// 第三步：具体创建store逻辑
+const createStoreImpl: CreateStoreImpl = (createState) => {
+  // ... ...
+}
+```
+
+## 创建 store
+
+`store` 的创建逻辑封装在 `createStoreImpl` 函数内
+
+首先定义了如下方法，对应不同职责
+
+- `setState` 供外部修改状态
+- `getState` 供外部获取状态
+- `subscribe` 利用事件监听机制，在状态更新时触发视图更新
+- `destroy` 销毁时删除所有事件监听
+
+```ts:src/valina.ts
+const getState: () => TState = () => state
+const subscribe: (listener: Listener) => () => void = (listener) => {
+    listeners.add(listener)
+    // Unsubscribe
+    return () => listeners.delete(listener)
+}
+// ... ...
+```
+
+然后将上述数个方法放在 `api` 对象中，调用我们在 `create API` 提供的函数，传入参数 `(setState, getState, api)` 创建出 `state` 状态
+
+```ts:src/valina.ts
+const api = { setState, getState, subscribe, destroy }
+state = (createState as PopArgument<typeof createState>)(
+    setState,
+    getState,
+    api
+)
+```
+
+最后将 `api` 对象透传到最外层，供 `createImpl` 捕获使用
+
+### set
+
+我们在回调函数内使用的 `set` 函数，接收 `partial` 和 `replace` 两个参数，主要会做以下事情
+
+1. 判断 `partial` 是否为函数，如果是，传入当前 `state` 并调用，得到 `nextState`；否则直接取 `partial` 为`nextState`
+2. 将 `nextState` 与 `state` 比较，如果不等，那么针对 `object` 数据类型使用 Object.assign 合并；否则直接赋值
+3. 其中如果 `replace = true`，那么直接将 `nextState` 覆盖状态
+4. 最后通知视图更新
+
+```ts:src/valina.ts
+const setState: SetStateInternal<TState> = (partial, replace) => {
+    const nextState =
+      typeof partial === 'function'
+        ? (partial as (state: TState) => TState)(state)
+        : partial
+    if (nextState !== state) {
+      const previousState = state
+      state =
+        replace ?? typeof nextState !== 'object'
+          ? (nextState as TState)
+          : Object.assign({}, state, nextState)
+      listeners.forEach((listener) => listener(state, previousState))
+    }
+  }
+```
+
+### get
+
+我们在外部获取的 `get` 函数比较简单，只是单纯的返回状态的函数
+
+```ts:src/valina.ts
+const getState: () => TState = () => state
+```
+
+### 创建 state
+
+最后将我们在代码里传入的函数与源码结合，实际形式是这样的，**zustand** 拿着 `createState` 函数，传入 `set` 等方法创建出 `state`
+
+```ts
+// 实际使用时传入的函数
+const createState = (set) => ({
+  data: 0,
+
+  action: {
+    setData: (payload: number) => {
+      set({ data: payload });
+    }
+  },
+})
+
+export const useStore = create<State>(createState);
+
+// 源码内部运行
+const setState = // ...
+const getState = // ...
+const api = // ...
+const state = createState(setState, getState, api)
+```
+
+## subscribe
+经过上面几个步骤，只是单纯创建了状态，还没有与 **react** 视图层建立联系。`createStoreImpl` 函数将整个 `api` 对象透传到了 `createImpl` 函数中
+
+里面会生成 `useBoundStore` 函数，也就是最终通过 `create API` 获取的 **hook**
+
+其会调用内部的 `useStore` 函数，利用 **react** 官方提供的 [useSyncExternalStoreWithSelector](https://reactjs.org/docs/hooks-reference.html#usesyncexternalstore) 让 `api.subscribe` 针对 `selector` 进行事件监听，与视图层进行关联，达到更新目的
+
+```ts:src/react.ts
+export function useStore<TState, StateSlice>(
+  api: WithReact<StoreApi<TState>>,
+  selector: (state: TState) => StateSlice = api.getState as any,
+  equalityFn?: (a: StateSlice, b: StateSlice) => boolean
+) {
+  const slice = useSyncExternalStoreWithSelector(
+    api.subscribe,
+    api.getState,
+    api.getServerState || api.getState,
+    selector,
+    equalityFn
+  )
+  useDebugValue(slice)
+  return slice
+}
+
+const useBoundStore: any = (selector?: any, equalityFn?: any) => useStore(api, selector, equalityFn)
+```
