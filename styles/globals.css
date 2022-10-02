@@ -118,7 +118,7 @@ html {
 .token.prolog,
 .token.doctype,
 .token.cdata {
-  @apply text-gray-700 dark:text-gray-300;
+  @apply text-gray-300 dark:text-gray-300;
 }
 
 .token.punctuation {
@@ -158,7 +158,10 @@ html {
   @apply text-blue-500;
 }
 
-.token.function,
+.token.function{
+  @apply text-green-500
+}
+
 .token.class-name {
   @apply text-pink-500;
 }

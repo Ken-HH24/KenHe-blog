@@ -44,7 +44,6 @@ const Container: React.FC<IProps> = ({ children }) => {
             <MobileMenu />
             <NavItem href="/" text="Home" />
             <NavItem href="/blog" text="Blog" />
-            <NavItem href="/tag" text="Tag" />
           </div>
           <ThemeButton />
         </nav>
