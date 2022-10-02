@@ -1,0 +1,292 @@
+---
+title: '从0到1项目总结-zustand篇'
+created_date: 2022-10-1
+description: '在一个从0到1的项目中的收获 - 状态管理zustand'
+---
+
+状态管理是前端项目里绕不开的话题，而近几年社区里也出现了很多出色的开源方案，以替代 redux 这类传统状态管理工具，zustand 就是一个不错的选择
+
+# 基本使用
+
+## 创建 store
+
+在 zustand 中利用 `create API` 便可以创建一个 store，在 store 中可以获取 `set` 与 `get` 方法，分别可以修改与访问数据
+
+同时为了清晰规范，还可以将同步操作放在一个 `action` 对象内，异步操作放在 `asyncAction` 里
+
+```ts:store/index.ts
+interface State {
+  offset: number;
+  // 同步操作
+  action: {
+    setOffset: (payload: number) => void;
+  };
+
+  // 异步操作
+  asyncAction: {
+    setOffsetAsync: () => void;
+  };
+}
+
+export const useStore = create<State>((set) => ({
+  offset: 0,
+
+  action: {
+    setOffset: (payload: number) => {
+      set({ offset: payload });
+    }
+  },
+
+  asyncAction: {
+    setOffsetAsync: () => {
+      // ... ...
+    }
+  }
+}));
+```
+
+## 消费 store
+
+在组件内直接引入 `useStore`，通过 `select` 语法可以访问到 `store` 内定义的数据与方法
+
+```tsx:pages/index.tsx
+import React from 'react';
+import { useStore } from '@/store';
+
+const IndexPage = () => {
+  const offset = useStore(state => state.offset)
+  const setOffset = useStore(state => state.action.setOffset)
+
+  return (
+    <div>
+        <div>offset: {offset}</div>
+        <div onClick={() => setOffset(5)}>set offset</div>
+    </div>
+  );
+};
+
+export default IndexPage;
+```
+
+---
+
+# slice pattern & Middleware
+
+## redux combineReducers
+
+如果对 `redux` 和 `redux-thunk` 熟悉的话一定对 `combineReducers` 的做法不陌生，能够将项目中分离的各个 `store` 赋予命名空间并统一管理，就像下面这种写法
+
+```ts:store/reducer.ts
+import { combineReducers } from 'redux';
+import { AReducer } from '../application/Recommend/store';
+import { BReducer } from '../application/Singers/store';
+import { CReducer } from '../application/Rank/store';
+
+export default combineReducers({
+    areducer: AReducer,
+    breducer: BReducer,
+    creducer: CReducer,
+})
+```
+
+```ts:store/index.ts
+import { createStore, compose, applyMiddleware } from 'redux';
+import thunk from 'redux-thunk';
+import reducer from './reducer';
+const composeEnhancers = compose;
+
+const store = createStore(reducer, composeEnhancers (
+    applyMiddleware (thunk)
+));
+
+export default store;
+```
+
+## zustand
+
+### 命名空间冲突
+
+而对于 zustand 来说，官方的最佳实践中提供了 [slice pattern](https://github.com/pmndrs/zustand/blob/main/docs/guides/typescript.md#slices-pattern) 的形式
+
+但是却缺少对于命名空间的处理，因此如果参照前面的 `action + asyncAction` 写法，多个 store 合并时会存在冲突
+
+例如针对一个列表场景，存在 `filterStore` 以及 `tableStore`，如果直接将其用 **slice pattern** 合并，以下代码会报错
+
+```tsx
+export interface TableState {
+  offset: number;
+  action: {
+    setOffset: (payload: number) => void;
+  };
+}
+
+export interface FilterState {
+  filters: Filter[];
+  action: {
+    setFilters: (payload: Filter[]) => void;
+  };
+}
+
+export type RootState = FilterState & TableState;
+
+export const useStore = create<RootState>()((...args) => ({
+  ...tableStore(...args),
+  ...filterStore(...args), // filterStore 的 action 直接将 tableStore 覆盖
+}));
+```
+
+原因是 `filterStore` 展开的 `action` 对象直接将 `tableStore` 覆盖，导致最后生成的 `store` 对象中缺少 `action.setOffset()` 函数，与定义的 `RootState` 不匹配
+
+### 显式赋予命名空间
+
+解决方法也比较简单，借鉴 `combineReducers` 的做法，将 `RootState` 定义为一个通过 key 索引至具体 store 的对象
+
+```ts
+export type RootState = {
+  filterStore: FilterState;
+  tableStore: TableState;
+};
+
+export const useStore = create<RootState>()((...args) => ({
+  tableStore: tableStore(...args),
+  filterStore: filterStore(...args),
+}));
+```
+
+### immer middleware
+
+将命名空间问题解决后，再次在 `action` 中调用 `set` 和 `get` 方法会发现，操作与访问的对象都是 `RootState`，如果想要改变一个层级很深的数据，那么可能需要以下写法，充斥着大量解构语法
+
+```ts
+export const filterStore: StateCreator<RootState, [], [], FilterState> = (set, get) => ({
+  filters: [],
+
+  action: {
+    setFilters: (payload: Filter[]) => {
+      const state = get();
+      set({
+        // 需要通过get函数获取全局state，并频繁解构
+        ...state,
+        filterStore: { ...state.filterStore, filters: payload },
+      });
+    },
+  },
+});
+```
+
+immer 中间件解决了这样的烦恼，并且带来的 **immutable** 特性能解决深浅拷贝带来的风险
+
+在 **slice pattern** 下使用 **immer** 中间件，主要有以下步骤
+
+1. 找到 **immer** 对应的 **mutators reference**
+2. 定义中间件数组，修改 `create` 和 `StateCreator` 泛型的第二个参数
+3. 在 `useStore` 入口按顺序引入
+4. 直接在 `setState` 回调中使用 **immer** 的赋值语法
+
+```ts:store/index.ts
+export type ZustandMiddlewareTypes = [['zustand/immer', never]];
+
+export const useStore = create<RootState, ZustandMiddlewareTypes>(
+  immer((...args) => ({
+    filterStore: filterStore(...args),
+    tableStore: tableStore(...args),
+  }))
+);
+```
+
+```ts:store/filter.ts
+import type { RootState, ZustandMiddlewareTypes } from '.';
+
+export const filterStore: StateCreator<
+  RootState,
+  ZustandMiddlewareTypes,
+  [],
+  FilterState
+> = (set) => ({
+  filters: [],
+
+  action: {
+    setFilters: (payload: Filter[]) => {
+      set((draft) => {
+        // 直接赋值，immer使用proxy劫持
+        draft.filterStore.filters = payload;
+      });
+    }
+  }
+});
+```
+
+---
+
+# 使用总结
+
+## 避免多余的重复渲染
+
+**zustand** 能够做到精确驱动 **React** 完成响应式更新，无论是 `RootState` 下不同 `store` 的修改，还是同一个 `StateCreator` 里面的不同变量，都只有访问该值的组件才会触发响应式更新
+
+但是有时候会一次性依赖 `store` 的多个数据，如果为了方便使用解构语法，那么可能会导致不必要的重复渲染，如下面由于 `<BComp />` 使用了解构语法，`tableStore` 里其他数据变化时，也会触发该组件的重复渲染
+
+```tsx
+const AComp = () => {
+  const totalCount = useStore((state) => state.tableStore.totalCount);
+
+  // ... ...
+};
+
+const BComp = () => {
+  // 使用解构语法，tableStore里的totalCount更新，也会触发重复渲染
+  const { offset } = useStore((state) => state.tableStore);
+
+  // ... ...
+};
+
+const IndexPage = () => {
+  return (
+    <div>
+      <AComp />
+      <BComp />
+    </div>
+  );
+};
+```
+
+### 使用 shallow API 避免
+
+如果依然希望将 `useStore` 返回值构造成对象或数组形式，由于每次返回都是一个新的引用，因此依然会造成重复渲染，如下面代码，即使没有访问到 `tableStore` 的其他数据，在其他数据改变时，依然会触发重复渲染
+
+```tsx
+const { offset } = useStore((state) => ({
+  offset: state.tableStore.offset,
+}));
+```
+
+解决办法是引入 **zustand** 提供的 `shallow API`，由 **zustand** 内部帮助我们去浅比较当前数据是否更新，对于对象和数组都是如此
+
+```tsx
+import shallow from 'zustand/shallow';
+
+const { offset } = useStore(
+  (state) => ({
+    offset: state.tableStore.offset,
+  }),
+  shallow
+);
+```
+
+## useState 写法
+
+如果同时需要读取某数据，以及获取该数据的修改方法，可以模仿 **React** 的 `useState API`，书写成数组形式
+
+当然不要忘记如果有必要，加入 `shallow` 避免重复渲染
+
+```tsx
+import shallow from 'zustand/shallow';
+
+const [offset, setOffset] = useStore((state) => [state.tableStore.offset, state.tableStore.action.setOffset], shallow);
+```
+
+---
+
+# 源码
+
+TODO
