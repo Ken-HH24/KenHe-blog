@@ -1,0 +1,251 @@
+---
+title: '从0到1项目总结-Formily篇'
+created_date: 2022-10-5
+description: '在一个从0到1的项目中的收获 - 复杂表单Formily'
+---
+
+在完成一个从 0 到 1 项目过程中，遇到了极其复杂的表单筛选表单，需要使用 **Formily** 来处理，也总结了一些实践经验
+
+# 开发模式
+
+**Formily** 有三种开发模式，分别为:
+
+1. JSON Schema
+2. Markup Schema
+3. JSX
+
+## JSON Schema
+
+**JSON Schema** 模式就是将描述表单数据状态定义在一份 **schema** 中，使用时直接将 **schema** 注入 **Formily** 中，达到视图逻辑分离，如官方例子所示
+
+```tsx
+const normalSchema = {
+  type: 'object',
+  properties: {
+    username: {
+      type: 'string',
+      title: '用户名',
+      required: true,
+      'x-decorator': 'FormItem',
+      'x-component': 'Input',
+    },
+    // ... ...
+  },
+};
+
+export default () => {
+  return (
+    <Form form={normalForm} layout="vertical" size="large" onAutoSubmit={console.log}>
+      <SchemaField schema={normalSchema} />
+    </Form>
+  );
+};
+```
+
+在开发过程中，可以将 **schema** 单独放在一个文件中，达到复用目的。这种模式更适合存储在数据库，用于动态渲染
+
+## Markup Schema
+
+该模式有点像是 **JSON Schema** 和 **JSX** 模式的结合
+
+```tsx
+<Form form={form}>
+  <SchemaField>
+    <SchemaField.String
+      name="username"
+      x-decorator="FormItem"
+      x-component="Input"
+      x-component-props={{
+        placeholder: 'Please Input',
+      }}
+    />
+  </SchemaField>
+</Form>
+```
+
+其与 **JSON Schema** 模式一样，贯彻了 **Formily** 的 **DSL** 协议，提高开发效率，更适用于源码开发
+
+## JSX
+
+该模式下与平时的业务代码编写没有什么区别，更适用于自定义组件和复杂联动场景
+
+```tsx
+<Field
+    name="password"
+    decorator={[FormItem]}
+    component={[Password, { placeholder: "Please Input" }]}
+/>
+<Field
+    name="confirm_password"
+    decorator={[FormItem]}
+    component={[Password, { placeholder: "Please Input" }]}
+/>
+```
+
+# 常用场景
+
+## 动态增减
+
+表单项的动态增减是十分常见的场景，接下来使用 **Markup Schema** 模式实现
+
+### 定义 DSL
+
+一份可以动态增减的表单，由外到里应该是
+
+1. FormProvider: 表单数据管理
+2. SchemaField.Array: 数组描述动态增减
+3. SchemaField.Object: 数组每一项都是一个对象，描述子表单项
+4. SchemaField.\*: 子表单项不同数据类型
+
+可以大致得出以下 **schema** 结构
+
+```tsx
+<FormProvider form={form}>
+  <SchemaField>
+    {/* Antd 的 ArrayItems 已经为我们自动添加index索引 */}
+    <SchemaField.Array name="array" x-component="ArrayItems">
+      <SchemaField.Object x-component="Space">
+        <SchemaField.String name="select" x-component="Select" />
+        {/* 其他数据... ... */}
+      </SchemaField.Object>
+    </SchemaField.Array>
+  </SchemaField>
+</FormProvider>
+```
+
+### 封装 ArrayItems
+
+官方提供的 **@formily/antd** 中有 **ArrayItems** ，提供表单项动态删减，自动添加 index 索引的能力，但是为了应对业务的复杂性，还是需要拥有自身拓展的能力
+
+结合官方文档，封装匹配 **SchemaField.Array** 的组件主要有以下思路：
+
+1. **RecursionField** 负责递归渲染子组件，
+2. **useField** 获取一个 **ArrayField** 类型的字段，通过 **push** 和 **remove** 方法控制添加与删除
+3. **useFieldSchema().items** 获取 **schema** 描述，回填到 **RecursionField**，重新转换为视图
+
+最后将该组件与上面 **DSL** 结构结合，便可以实现表单项的动态删减
+
+```tsx
+const ArrayItems = observer((props: any) => {
+  const field = useField<ArrayField>();
+  const fieldSchema = useFieldSchema();
+
+  // 数组情况暂时只取第一项
+  const itemsSchema = Array.isArray(fieldSchema.items) ? fieldSchema.items[0] : fieldSchema.items || {};
+
+  return (
+    <div>
+      {props.value?.map((_: any, index: number) => {
+        return (
+          <Space key={index}>
+            <RecursionField schema={itemsSchema} name={index} />
+            <Button onClick={() => field.remove(index)}>remove</Button>
+          </Space>
+        );
+      })}
+      <Button onClick={() => field.push({})}>add</Button>
+    </div>
+  );
+});
+```
+
+## 被动联动
+
+在 **Formily** 中，联动模式分为两类，主动联动与被动联动。当填入 `target` 属性时，即为主动联动，适合一对多的联动场景；否则为被动联动，适合多对一的联动场景
+
+**Markup JSON** 场景下，**Formily** 的联动是通过 **x-reactions** 字段实现的，写法也有多种:
+
+1. 字段属性 `dependencies + fullfill` - **dependencies** 根据 **FormPath** 模式匹配，然后在 **fullfill** 字段里添加 **state** 与 **schema** 等更新字段状态
+2. 回调函数 `(field: Field) => void` - 通过回调函数拿到该字段的 **Field** 实例，做各种复杂的联动逻辑，由于 **Formily** 在 **Field** 字段上层做了 **Proxy** 处理，因此和 **Mobx, Vue** 类似，联动里的依赖项其都能追踪到
+
+### 回调函数联动
+
+在回调函数里面可以直接拿到该字段 `field` 实例，然后进行各种复杂的表单联动，在遇到的具体业务场景中，我在使用 `dependencies` 时发现貌似不支持路径的局部匹配，这个时候就很适合使用回调函数模式进行联动
+
+接下来是具体的业务场景，在列表筛选中，将每一个筛选项分为了「左值」，「操作符」与「右值」。「左值」可选择的数据项数量每次都是固定的，当用户在一个筛选项中选择了某值后，该值就不能再出现在在其他筛选项中
+
+举一个简单的例子，可选项为 0-10，当用户在某筛选项的「左值」选择了 3，那么动态添加其他空白筛选项后，3 并不会出现在这些筛选项的选项中，实现该功能主要有以下思路：
+
+1. 在 `x-reactions` 通过回调函数传入的 `field`，获取整个表单 `form` 实例
+2. 通过 `form.query()` 语法查询所有筛选项的已选左值
+3. 在数据源中将所有已选左值过滤，通过 `field.setDataSource()` 将新数据源重新注入当前字段左值
+
+```tsx
+const ENUMS = new Array(10).fill(0).map((_, index) => ({ label: index, value: index }));
+
+<SchemaField.String
+  name="filterLeft"
+  enum={ENUMS}
+  x-decorator="FormItem"
+  x-component="Select"
+  x-component-props={{ style: { width: 400 } }}
+  x-reactions={(field: FieldType) => {
+    // 获取表单实例
+    const form = field.form;
+    const selectedLeftValue: any[] = [];
+    // 查询所有左值并过滤
+    form.query('filterArray.*.filterLeft').forEach((filterLeftField) => {
+      const leftValue = (filterLeftField as FieldType)?.value;
+      if (leftValue !== field.data) {
+        selectedLeftValue.push(leftValue);
+      }
+    });
+    // 重新设置当前字段dataSource
+    field.setDataSource(ENUMS.filter((val) => !selectedLeftValue.includes(val.value)));
+  }}
+/>;
+```
+
+### dependencies 联动
+
+通过 `dependencies`, `when` 和 `fullfill` 等字段实现联动是 **Formily** 里面实现得非常优雅的一部分。
+
+不同于前面的回调函数模式，该模式将依赖项一一列举，然后按照情况对字段的 `schema` 和 `state` 进行更新，让人们能很快找到联动的依赖项与逻辑结果。同时贯彻了 **DSL**，赋予路径匹配，表达作用域等概念，让联动功能更加强大
+
+接下来是具体的业务场景，前面属于筛选项左值的纵向联动，接下来要实现「左值」与「操作符」的联动。当「左值」改变时，需要通过新值来匹配到对应的数据源，赋予给「操作符」
+
+举一个简单的例子，当「左值」的值为 1 时，「操作符」的选项需要对应到「是/否」；当「左值」的值为 2 时，「操作符」的选项需要对应到「等于/不等于」，实现该功能主要有以下思路:
+
+1. 利用 **Formily** 的路径匹配，在 `dependencies` 字段中添加相对路径 `[.filterLeft]` , 如果当前路径为 `filterArray.0.filterOpt`， 那么 `.filterLeft` 则会匹配到 `filterArray.0.filterLeft`，每添加一个 **.** 便会往前退一步
+2. 通过 `$deps[0]` 获取到当前「左值」，通过 `when` 属性来区分场景进行联动
+3. 通过 `fullfill.schema` ，对 `enum` 和 `value` 等属性进行更新，实现联动
+
+```tsx
+<SchemaField.String
+  name="filterOpt"
+  x-decorator="FormItem"
+  x-component="Select"
+  enum={ENUMS}
+  x-component-props={{ style: { width: 400 } }}
+  x-reactions={[
+    {
+      dependencies: ['.filterLeft'],  // 匹配到filterArray.*.filterLeft
+      when: '{{ $deps[0] === 1 }}', // 「左值」为1情况
+      fulfill: {
+        schema: {
+          'x-value': 0,  // 联动时将值清空，同时默认赋值选项第一项
+          enum: [
+            { label: '是', value: 0 },
+            { label: '否', value: 1 },
+          ],
+        },
+      },
+    },
+    {
+      dependencies: ['.filterLeft'],
+      when: '{{ $deps[0] === 2 }}',
+      fulfill: {
+        schema: {
+          'x-value': 'eq', // 联动时将值清空，同时默认赋值选项第一项
+          enum: [
+            { label: '等于', value: 'eq' },
+            { label: '不等于', value: 'noteq' },
+          ],
+        },
+      },
+    },
+  ]}
+/>
+```
+
+## scope
